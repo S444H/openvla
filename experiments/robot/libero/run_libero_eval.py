@@ -30,6 +30,12 @@ from libero.libero import benchmark
 
 import wandb
 
+import torch
+import functools
+# 强制将所有 torch.load 调用的 weights_only 参数设为 False
+torch.load = functools.partial(torch.load, weights_only=False)
+
+
 # Append current directory so that interpreter can find experiments.robot
 sys.path.append("../..")
 from experiments.robot.libero.libero_utils import (
@@ -76,7 +82,7 @@ class GenerateConfig:
     # Utils
     #################################################################################################################
     run_id_note: Optional[str] = None                # Extra note to add in run ID for logging
-    local_log_dir: str = "./experiments/logs"        # Local directory for eval logs
+    local_log_dir: str = "./Evals/logs"              # Local directory for eval logs
 
     use_wandb: bool = False                          # Whether to also log results in Weights & Biases
     wandb_project: str = "YOUR_WANDB_PROJECT"        # Name of W&B project to log to (use default!)
