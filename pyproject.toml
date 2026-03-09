@@ -73,6 +73,8 @@ homepage = "https://github.com/openvla/openvla"
 repository = "https://github.com/openvla/openvla"
 documentation = "https://github.com/openvla/openvla"
 
+
+# 开发工具的统一规则 ([tool.*])
 [tool.setuptools.packages.find]
 where = ["."]
 exclude = ["cache"]

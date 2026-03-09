@@ -17,6 +17,7 @@ Usage:
         --wandb_entity <ENTITY>
 """
 
+import functools
 import os
 import sys
 from dataclasses import dataclass
@@ -25,13 +26,11 @@ from typing import Optional, Union
 
 import draccus
 import numpy as np
+import torch
 import tqdm
+import wandb
 from libero.libero import benchmark
 
-import wandb
-
-import torch
-import functools
 # 强制将所有 torch.load 调用的 weights_only 参数设为 False
 torch.load = functools.partial(torch.load, weights_only=False)
 
