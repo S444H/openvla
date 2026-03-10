@@ -1,7 +1,7 @@
 """
 data_utils.py
+数据整理器 (Collator)
 
-General utilities and classes for facilitating data loading and collation.
 """
 
 from dataclasses import dataclass

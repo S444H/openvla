@@ -1,0 +1,45 @@
+高层应用与加载入口 (API & Factory)
+│
+├── load.py  (模型加载的高层API)
+│    └── --> 依赖: materialize.py (工厂), registry.py (注册表)
+│
+├── registry.py (模型名称与配置的注册中心)
+│    └── --> 依赖: prismatic.conf.models (读取超参数)------------------------------------------------外部
+│
+└── materialize.py (模型实例化工厂)
+     ├── --> 依赖: vlms.prismatic (获取 PrismaticVLM 架构)
+     ├── --> 依赖: backbones.vision.* (获取各类视觉基座如 CLIP, SigLIP)
+     └── --> 依赖: backbones.llm.* (获取各类语言基座如 Llama2, Mistral)
+
+======================================================================
+动作控制层 (Action Policy)
+│
+└── vlas/openvla.py (核心机器人动作模型)
+     ├── [继承] --> vlms.prismatic.PrismaticVLM (继承视觉语言大模型的所有能力)
+     └── [注入] --> prismatic.vla.action_tokenizer.ActionTokenizer (引入动作分词与反归一化能力)----------外部
+
+======================================================================
+模态融合层 (Vision-Language Models)
+│
+├── vlms/prismatic.py (具体的 VLM 骨架，负责拼接特征和冻结参数)
+│    ├── [继承] --> vlms.base_vlm.VLM (实现抽象基类的规则)
+│    └── [组合] --> prismatic.util.nn_utils (Projectors：Linear, MLP, FusedMLP 投影层)----------------外部
+│
+└── vlms/base_vlm.py (VLM 抽象基类)
+     ├── [继承] --> torch.nn.Module, transformers.GenerationMixin (获得 PyTorch 和 HF 的底层支持)
+     ├── [聚合] --> backbones.vision.base_vision.VisionBackbone (持有视觉基座实例)
+     └── [聚合] --> backbones.llm.base_llm.LLMBackbone (持有语言基座实例)
+
+======================================================================
+底层基座层 (Foundational Backbones)
+│
+├── backbones/vision/ (视觉特征提取)
+│    ├── base_vision.py (视觉基类)
+│    └── clip_vit.py, siglip_vit.py, dinov2_vit.py, etc. (具体的视觉编码器，基于 TIMM 或 HF)
+│
+└── backbones/llm/ (语言模型与提示词)
+     ├── base_llm.py (语言基类)
+     ├── llama2.py, mistral.py, phi.py (具体的大语言模型包装器)
+     └── prompting/ (提示词模板)
+          ├── base_prompter.py
+          └── vicuna_v15_prompter.py, llama2_chat_prompter.py, etc.

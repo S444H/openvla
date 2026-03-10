@@ -3,6 +3,10 @@ torch_utils.py
 
 General utilities for randomness, mixed precision training, and miscellaneous checks in PyTorch.
 
+在 Linux 系统中，多进程通常是通过 os.fork() 创建的
+这意味着每一个 Worker（子进程）被创建时，会完全复制主进程的内存状态，
+包括当时 numpy.random 和 Python 内置 random 模块的随机数生成器状态（Random State）
+
 Random `set_global_seed` functionality is taken directly from PyTorch-Lighting:
     > Ref: https://github.com/PyTorchLightning/pytorch-lightning/blob/master/pytorch_lightning/utilities/seed.py
 

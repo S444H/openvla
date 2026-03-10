@@ -13,9 +13,9 @@ from PIL import Image
 from transformers import LlamaTokenizerFast
 
 from prismatic.models.vlms.prismatic import PrismaticVLM
-from prismatic.overwatch import initialize_overwatch
 from prismatic.vla.action_tokenizer import ActionTokenizer
 
+from prismatic.overwatch import initialize_overwatch
 # Initialize Overwatch =>> Wraps `logging.Logger`
 overwatch = initialize_overwatch(__name__)
 

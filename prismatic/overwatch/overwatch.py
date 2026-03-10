@@ -1,14 +1,16 @@
 """
 overwatch.py
+在进行多 GPU 或多节点的大模型训练时，打印日志和管理进程是一件容易引发混乱的事情（比如 8 张卡同时向控制台 print 信息，会导致屏幕完全没法看）
+Overwatch （守望者）这个类的设计就是为了优雅地解决这些问题
 
 Utility class for creating a centralized/standardized logger (built on Rich) and accelerate handler.
 """
 
 import logging
 import logging.config
+from logging import LoggerAdapter
 import os
 from contextlib import nullcontext
-from logging import LoggerAdapter
 from typing import Any, Callable, ClassVar, Dict, MutableMapping, Tuple, Union
 
 # Overwatch Default Format String
@@ -36,6 +38,7 @@ logging.config.dictConfig(LOG_CONFIG)
 
 
 # === Custom Contextual Logging Logic ===
+# 让日志看起来更有层级感
 class ContextAdapter(LoggerAdapter):
     CTX_PREFIXES: ClassVar[Dict[int, str]] = {**{0: "[*] "}, **{idx: "|=> ".rjust(4 + (idx * 4)) for idx in [1, 2, 3]}}
 
@@ -43,7 +46,7 @@ class ContextAdapter(LoggerAdapter):
         ctx_level = kwargs.pop("ctx_level", 0)
         return f"{self.CTX_PREFIXES[ctx_level]}{msg}", kwargs
 
-
+# 多卡
 class DistributedOverwatch:
     def __init__(self, name: str) -> None:
         """Initializer for an Overwatch object that wraps logging & `accelerate.PartialState`."""
@@ -91,7 +94,7 @@ class DistributedOverwatch:
     def world_size(self) -> int:
         return self.distributed_state.num_processes
 
-
+# 单卡
 class PureOverwatch:
     def __init__(self, name: str) -> None:
         """Initializer for an Overwatch object that just wraps logging."""

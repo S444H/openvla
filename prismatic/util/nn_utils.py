@@ -1,7 +1,7 @@
 """
 nn_utils.py
+投影器 (Projector)
 
-Utility functions and PyTorch submodule definitions.
 """
 
 import torch
