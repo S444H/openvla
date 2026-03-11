@@ -1,0 +1,28 @@
+分布式训练引擎
+
+高层策略分发中心 (API & Factory)
+│
+└── materialize.py (训练策略工厂)
+     └── --> 依赖: 依据传入的 `train_strategy` 字符串，返回 DDP 或 FSDP 训练实例。
+
+======================================================================
+训练策略层 (Training Strategies)
+│
+├── strategies/base_strategy.py (抽象基类)
+│    ├── run_training(): 传统 VLM 的基础训练循环。
+│    └── run_vla_training(): 专为机器人设计的训练循环，额外计算动作的 L1 Loss 和 Action Token 准确率。
+│
+├── strategies/fsdp.py (FSDP 全分片数据并行)
+│    ├── [继承] --> base_strategy.py
+│    └── 实现细节: 大模型炼丹必备。通过 `torch.distributed.fsdp` 将模型权重、梯度切片分布到各个 GPU，防止显存溢出 (OOM)。
+│
+└── strategies/ddp.py (DDP 传统数据并行)
+     ├── [继承] --> base_strategy.py
+     └── 实现细节: 每个 GPU 维持一份完整的模型副本，仅适用于显存装得下整个模型的情况。
+
+======================================================================
+监控与日志层 (Metrics & Logging)
+│
+└── metrics.py (记录 Loss、学习率等指标)
+     ├── JSONLinesTracker: 负责将指标追加写入本地的 `.jsonl` 日志文件。
+     └── WeightsBiasesTracker: 负责将指标同步到 Weights & Biases (wandb) 云端仪表盘。

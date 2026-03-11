@@ -1,0 +1,56 @@
+======================================================================
+[第五层] PyTorch 训练对接层 (Top-Level PyTorch Interface)
+这里是数据流的终点，输出的是完全准备好送入 GPU 的张量字典。
+│
+├── vla/materialize.py (数据流调度总控室)
+│    └── --> 统筹组装 Dataset, Collator 和 Tokenizer，暴露给外层 train.py。
+│
+├── util/data_utils.py::PaddedCollatorForActionPrediction                             -----------------外部
+│    └── --> 负责将长短不一的文本序列补齐 (Padding)，生成 batch_size 维度的张量矩阵。
+│
+└── vla/datasets/datasets.py
+     ├── RLDSDataset: 将 TFDS 管道包装为 PyTorch 可遍历的 IterableDataset。
+     └── RLDSBatchTransform:
+          ├── 拼装对话 Prompt ("What action should the robot take to...")。
+          ├── 提取 Labels，并将 Prompt 部分的 Loss 权重屏蔽为 -100 (IGNORE_INDEX)。
+          └── --> 依赖: vla/action_tokenizer.py 将连续动作翻译为离散 Token。
+
+======================================================================
+[第四层] 多数据集混合与调度层 (Dataset Mixture & Orchestration)
+这里负责协调几十个不同来源的机器人数据集，保证训练数据的多样性和平衡。
+│
+└── vla/datasets/rlds/dataset.py::make_interleaved_dataset
+     ├── 根据配方权重 (sample_weights) 为每个子数据集分配 CPU 读取线程和解析线程。
+     ├── dl.DLataset.sample_from_datasets: 在帧级别 (Frame-level) 按照比例交替采样。
+     └── .shuffle(shuffle_buffer_size): 维持一个巨大的内存缓冲区，对混合后的数据进行全局随机打乱。
+
+======================================================================
+[第三层] 轨迹与帧操作层 (Trajectory & Frame Transformations)
+这里负责对单个数据集的原始数据进行张量变换和图像处理，主要依靠 CPU 算力。
+│
+├── vla/datasets/rlds/traj_transforms.py (轨迹级变换)
+│    └── chunk_act_obs: 极其重要！通过时间窗口滑动，将整条连续视频序列切片为 (Past, Current, Future) 动作与观测块。
+│
+├── vla/datasets/rlds/obs_transforms.py (帧级变换)
+│    └── 使用 `tf.data.AUTOTUNE` 和多线程进行图像解码 (Decode)、缩放 (Resize) 和色彩/裁剪增强 (Data Augmentation)。
+│
+└── vla/datasets/rlds/utils/
+     ├── goal_relabeling.py: 动态计算并替换强化学习中的目标状态。
+     └── task_augmentation.py: 随机丢弃某些模态信息，增强模型的鲁棒性。
+
+======================================================================
+[第二层] 原始数据对齐与标准化层 (Standardization & Normalization)
+不同实验室采集的数据键名和动作尺度千奇百怪，这里负责“书同文，车同轨”。
+│
+└── vla/datasets/rlds/dataset.py::make_dataset_from_rlds
+     ├── restructure(): 将各自为政的相机命名（如 workspace, wrist）统一映射为 image_primary 等标准键名。
+     └── normalize_action_and_proprio(): 根据预先统计的极值，将动作坐标统一映射（归一化）到 [-1, 1] 区间。
+
+======================================================================
+[第一层] 物理文件与生态配置层 (Storage & OXE Configs)
+这里是数据流的起点，定义了存在硬盘上的 TFRecord 文件及其物理属性。
+│
+└── vla/datasets/rlds/oxe/
+     ├── configs.py: 记录了每个子数据集（如 Bridge, DROID, Fractal2022）的原始物理属性（是绝对坐标还是相对 delta 坐标？是否有末端执行器旋转数据？）。
+     ├── mixtures.py: 像厨房菜谱一样，定义了训练所需的“数据大乱炖”配方（如 `oxe_magic_soup_plus` 包含了哪些子数据集，各自权重是多少）。
+     └── TFDS/dlimp 底层读取器: 从磁盘/网络并行读取压缩的 TFRecord 文件。

@@ -1,0 +1,17 @@
+机器人评估与部署层 (Robot Evaluation)
+│
+├── robot_utils.py & openvla_utils.py (通用与模型专属工具箱)
+│    ├── openvla_utils.py: 负责统一加载 Hugging Face 格式的 OpenVLA 模型 (`AutoModelForVision2Seq`) 和对应的 Processor。
+                           封装了 `get_vla_action`，将环境图像和指令拼接成 Prompt 交给模型推理，并处理了为了防止分布偏移而进行的 `crop_and_resize` 图像中心裁剪增强。
+│    └── robot_utils.py: 负责对最让人头疼的夹爪动作 (Gripper Action) 进行标准化 (`normalize_gripper_action`) 与反转 (`invert_gripper_action`)，以适配不同物理环境的开闭逻辑。
+│
+├── bridge/ (真实物理机械臂环境 - WidowX)
+│    ├── run_bridgev2_eval.py: 真机主循环。没有自动判定机制，需要人类操作员在终端按下回车键开始，观察动作后手动输入 `r` 重试或回车继续，
+                               甚至可以通过 `Ctrl-C` 触发急停 (KeyboardInterrupt) 保障物理安全。
+│    └── widowx_env.py: 物理客户端。它没有任何本地物理引擎，而是通过 `WidowXClient` 通过网络向真机工控机发送动作坐标 (`step_action`)，并拉取真实相机图像 (`get_observation`)。
+│
+└── libero/ (Robosuite 物理仿真环境)
+     ├── run_libero_eval.py: 仿真主循环。自动遍历 LIBERO 的各个任务集 (如 Spatial, Object)，
+                             在 `while` 循环中调用 `env.step(action)`，并根据仿真器返回的 `done` 信号自动统计并打印 `task_successes` (成功率)。
+     └── libero_utils.py: 仿真辅助工具。包含处理四元数到轴角转换的 `quat2axisangle`，处理图像翻转 (`img[::-1, ::-1]`) 以对齐训练数据，
+                          以及利用 `imageio` 将评估过程渲染并录制成 `.mp4` 回放视频的 `save_rollout_video`。

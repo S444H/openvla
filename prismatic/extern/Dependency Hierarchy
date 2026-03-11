@@ -1,0 +1,31 @@
+放弃原有的高度解耦框架，严格按照 Hugging Face (HF) 社区的标准规范，将整个模型重新包装一遍
+拥抱“😀”, 定义化标准接口：
+
+‘’‘
+processor = AutoProcessor.from_pretrained("your-model-name")
+model = AutoModelForCausalLM.from_pretrained("your-model-name")
+
+inputs = processor(text="...", images=...)
+outputs = model.generate(**inputs)
+‘’‘
+白嫖 Hugging Face 社区里成千上万的现成工具（比如量化工具 BitsAndBytes、微调工具 PEFT、加速推理工具 vLLM 等）
+
+
+
+
+Hugging Face 标准 API 适配层 (HF Adapters)
+│
+├── configuration_prismatic.py (配置字典化)
+│    ├── [继承] --> transformers.PretrainedConfig
+│    ├── PrismaticConfig: 将所有超参数扁平化，使其可以被 `config.json` 序列化保存。
+│    └── OpenVLAConfig: 额外记录了机器人的动作极值 (norm_stats) 和 动作分箱数 (n_action_bins)。
+│
+├── modeling_prismatic.py (模型架构重构)
+│    ├── [继承] --> transformers.PreTrainedModel
+│    ├── PrismaticForConditionalGeneration: 在这一个文件里重新手写了视觉特征提取和 Projector，然后跟 HF 的 CausalLM 缝合。重写了 `forward()` 和 `prepare_inputs_for_generation()`。
+│    └── OpenVLAForActionPrediction: 针对机器人任务，封装了 `predict_action` 推理与反归一化代码。
+│
+└── processing_prismatic.py (图像与文本输入处理)
+     ├── [继承] --> transformers.ProcessorMixin
+     ├── PrismaticImageProcessor: 复刻了原本在底层工具中的图像缩放（如 letterbox 填充）、居中裁剪和标准化操作。
+     └── PrismaticProcessor: 将图像处理和 LLM Tokenizer 打包。一键调用 `processor(text=..., images=...)` 即可输出模型需要的张量。

@@ -1,0 +1,28 @@
+纯视觉-语言模型 (VLM, 类似 LLaVa) 的数据预处理和预训练管道
+
+高层装配工厂 (API & Factory)
+│
+└── materialize.py (构建 VLM 预训练数据管道的唯一对外接口)
+     ├── 根据传入的 `stage` (align 或 finetune)，实例化对应的 Dataset。
+     ├── --> 依赖: util.data_utils.PaddedCollatorForLanguageModeling (传统的 VLM 语言建模批次对齐器)
+     └── --> 依赖: datasets/datasets.py (获取底层 PyTorch Dataset)
+
+======================================================================
+数据集定义层 (PyTorch Dataset Definitions)
+│
+└── datasets/datasets.py (传统的基于本地 JSON+图片的 PyTorch 数据集)
+     ├── AlignDataset:
+     │    └── 强行丢弃人类的 Prompt，直接使用 "<image> + caption" 格式训练模型预测描述，实现视觉特征与文本的对齐。
+     │
+     └── FinetuneDataset:
+          ├── 支持纯文本 (Unimodal) 和图文 (Multimodal) 混合训练。
+          └── 遍历对话轮次 (Turn)，并将 "USER:" 提问部分的 Loss 权重设为 IGNORE_INDEX (-100)，仅对 "ASSISTANT:" 的回复计算 Loss。
+
+======================================================================
+数据下载与准备层 (Data Downloader)
+│
+└── download.py (自动化下载开源 VLM 数据集的脚本)
+     ├── 内置了 `DATASET_REGISTRY`，硬编码了 LLaVa v1.5 所需的所有数据集下载链接 (如 COCO, GQA, OCR-VQA 等)。
+     ├── 提供带进度条的多线程下载 (`download_with_progress`) 和自动解压 (`extract_with_progress`) 功能。
+     └── 提供特定的格式清洗逻辑，比如强制把所有的 `.gif` 和 `.png` 转换为 `.jpg` 以统一格式。
+

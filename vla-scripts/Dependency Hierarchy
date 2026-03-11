@@ -1,0 +1,27 @@
+高层执行脚本 (Application / Execution Scripts)
+│
+├── train.py (原生的分布式大规模预训练)
+│    ├── 适用场景: 拥有顶级算力集群，需要从零训练或进行全参数大规模训练。
+│    └── 核心依赖: 强依赖 `prismatic/` 底层原生代码 (FSDP 策略、RLDS 数据流)。
+│
+├── finetune.py (基于 Hugging Face 生态的轻量级微调)
+│    ├── 适用场景: 算力有限（单卡或几张卡），需要在自己的小数据集上让 OpenVLA 适配新机械臂。
+│    └── 核心依赖: 完全依赖 `extern/hf/` 的转换代码、Hugging Face `transformers` 以及 `PEFT` 库。
+│
+└── deploy.py (物理世界部署与推理服务端)
+     ├── 适用场景: 模型训练完毕，准备接入真实机械臂。
+     └── 核心依赖: 依赖 `FastAPI` 和 Hugging Face 推理 API。
+
+
+
+vla-scripts/extern
+模型出口与转换层 (Export & Conversion)
+│
+├── convert_openvla_weights_to_hf.py (核心！权重转换脚本)
+│    ├── 作用: 将原生的分布式训练字典转换成 HF 标准目录。
+│    ├── 输入: `train.py` 训练出来的 `latest-checkpoint.pt` 和 `config.yaml`。
+│    └── 输出: Hugging Face 格式的目录，包含 `config.json`、`model.safetensors`、`preprocessor_config.json` 等。
+│
+└── verify_openvla.py (正确性校验脚本)
+     ├── 作用: 质检员。验证转换后的 HF 模型是否与转换前的原生模型输出完全一致。
+     └── 逻辑: 分别用原生代码和 HF API 加载模型，给它们喂入相同的图片和文本，检查输出的 Action Token 和连续动作数值是否 100% 匹配。
