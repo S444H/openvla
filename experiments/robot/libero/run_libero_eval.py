@@ -59,7 +59,7 @@ from experiments.robot.robot_utils import (
 @dataclass
 class GenerateConfig:
     # fmt: off
-
+    # 告诉代码格式化工具（如 black）忽略以下代码的格式化
     #################################################################################################################
     # Model-specific parameters
     #################################################################################################################
@@ -90,7 +90,7 @@ class GenerateConfig:
     seed: int = 7                                    # Random Seed (for reproducibility)
 
     # fmt: on
-
+    # 恢复代码格式化工具的作用
 
 @draccus.wrap()
 def eval_libero(cfg: GenerateConfig) -> None:
@@ -265,6 +265,7 @@ def eval_libero(cfg: GenerateConfig) -> None:
         log_file.write(f"Current task success rate: {float(task_successes) / float(task_episodes)}\n")
         log_file.write(f"Current total success rate: {float(total_successes) / float(total_episodes)}\n")
         log_file.flush()
+
         if cfg.use_wandb:
             wandb.log(
                 {

@@ -4,30 +4,45 @@ experiments/ (模型“考场”：物理与仿真部署层)
      │
      ├── 核心工具箱 (Core Utilities)
      │    ├── openvla_utils.py (OpenVLA 推理封装)
-     │    │    ├── 依赖: Hugging Face `transformers` 库。
-     │    │    └── 核心: 提供 `get_vla` (加载模型) 和 `get_vla_action` (图像裁剪、组装 Prompt 并生成动作张量)。
+     │    │    ├── 依赖: Hugging Face `transformers` 库，用于加载 AutoModel 和 AutoProcessor。
+     │    │    └── 核心: 提供 `get_vla` (加载模型并配置 BF16/Flash-Attention) 和 `get_vla_action` (执行图像中心裁剪、组装 Prompt 并调用模型生成动作张量)。
      │    │
-     │    └── robot_utils.py (机器人动作标准化)
-     │         └── 核心: 包含 `normalize_gripper_action` 和 `invert_gripper_action`。负责把模型输出的 [0, 1] 或 [-1, 1] 转换为特定机械臂能懂的“张开/闭合”指令。
+     │    └── robot_utils.py (机器人动作标准化与通用评估工具)
+     │         ├── [内部依赖] --> openvla_utils.py
+     │         │    └── 逻辑: 作为代理层，通过 `get_model` 和 `get_action` 统一封装对 OpenVLA 底层函数的调用。
+     │         ├── [外部依赖] --> numpy & torch
+     │         │    └── 逻辑: 管理 GPU/CPU 设备，统一 Python/PyTorch/NumPy 随机种子以保证评估的可重复性。
+     │         └── 核心: 包含 `normalize_gripper_action` (将夹爪输出归一化至 [-1, 1]) 和 `invert_gripper_action` (反转夹爪正负号以匹配特定环境逻辑)。
      │
      ├── bridge/ (Real: 真实物理环境 - WidowX 机械臂)
      │    ├── run_bridgev2_eval.py (真机评估主循环)
      │    │    ├── [注入] --> openvla_utils.py (获取大模型大脑)
-     │    │    ├── [注入] --> robot_utils.py (处理夹爪开闭)
-     │    │    ├── [依赖] --> widowx_env.py (实例化物理环境)
-     │    │    └── 逻辑: 需要人类操作员在终端按回车确认安全，主观判断任务是否成功。
+     │    │    ├── [注入] --> robot_utils.py (处理动作获取与转换)
+     │    │    ├── [依赖] --> widowx_env.py (实例化机器人环境)
+     │    │    └── 逻辑: 包含实时控制循环，每步刷新观测 (`refresh_obs`)，记录执行时间，并支持用户手动重做（redo）失败的片段。
+     │    │
+     │    ├── bridgev2_utils.py (真实环境专属工具箱)
+     │    │    ├── 图像处理: `resize_image` (使用 TensorFlow 实现 Lanczos3 缩放，确保输入图像分布与训练时一致)。
+     │    │    ├── 录像与数据: `save_rollout_video` (存为 .mp4) 和 `save_rollout_data` (将图像、状态、动作存为 .npz 文件)。
+     │    │    └── 交互控制: `get_next_task_label` (动态获取用户输入的语言指令)。
      │    │
      │    └── widowx_env.py (物理机通信客户端)
-     │         └── 逻辑: 内部没有物理引擎，通过 `WidowXClient` (HTTP/RPC) 向连接着真实电机的宿主机发送 `step_action`，并拉取真实相机图像。
+     │         └── 逻辑: 内部通过 `WidowXClient` 通信。`step` 方法向真实电机发送指令并拉取相机图像，`move_to_start_state` 负责将机械臂复位至初始姿态。
      │
-     └── libero/ (Sim: Robosuite 仿真环境)
+     └── libero/ (Sim: LIBERO 仿真环境)
           ├── run_libero_eval.py (仿真评估主循环)
           │    ├── [注入] --> openvla_utils.py (获取大模型大脑)
-          │    ├── [注入] --> robot_utils.py (处理夹爪开闭)
+          │    ├── [注入] --> robot_utils.py (归一化与反转夹爪动作)
           │    ├── [依赖] --> libero_utils.py (获取仿真专用处理)
-          │    └── 逻辑: 自动遍历任务集，`while` 循环调用 `env.step()`，依靠仿真引擎返回的 `done` 信号自动计算成功率。
+          │    └── 逻辑: 自动遍历任务集（如 `libero_spatial`），针对每个任务运行多轮试验（Trials），并自动计算成功率记录到本地和 W&B。
+          │
+          ├── regenerate_libero_dataset.py (仿真数据集清洗/重建)
+          │    └── 逻辑: 通过 `OffScreenRenderEnv` 重放 HDF5 演示数据，过滤掉不改变状态的 `is_noop` 动作，并将图像统一缩放至 256x256 以生成高质量训练集。
+          │
+          ├── libero_requirements.txt (仿真专属环境依赖)
+          │    └── 核心: 记录了运行 LIBERO 所需的 `robosuite`, `bddl`, `gym` 等关键物理仿真库。
           │
           └── libero_utils.py (仿真环境专属工具箱)
-               ├── 数学转换: `quat2axisangle` (将仿真器常用的四元数转换为 OpenVLA 预测的轴角旋转向量)。
-               ├── 图像对齐: 翻转图像维度以匹配 Open-X 训练数据。
-               └── 录像生成: `save_rollout_video` (用 `imageio` 把走过的帧存为 .mp4 以便复盘)。
+               ├── 数学转换: `quat2axisangle` (将四元数转换为轴角格式，以适配 OpenVLA 的动作空间)。
+               ├── 图像对齐: `get_libero_image` (包含将图像旋转 180 度，以纠正仿真器输出与训练数据之间的视角差异)。
+               └── 录像生成: `save_rollout_video` (根据任务描述和成功状态自动命名并保存 MP4 录像)。
